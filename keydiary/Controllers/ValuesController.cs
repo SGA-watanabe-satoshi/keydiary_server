@@ -32,6 +32,8 @@ namespace keydiary.Controllers
             this.Timestamp = value.TimeStamp;
             this.FilenameHash = value.FilenameHash;
         }
+        public EventEntity() { }
+
         public string LanguageID { get; set; }
         public string UserID { get; set; }
         public int WordCount { get; set; }
