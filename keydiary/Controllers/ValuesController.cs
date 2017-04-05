@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Web.Http;
 using Microsoft.Azure; // Namespace for CloudConfigurationManager
 using Microsoft.WindowsAzure.Storage; // Namespace for CloudStorageAccount
@@ -29,7 +26,7 @@ namespace keydiary.Controllers
             this.LanguageID = value.LanguageID;
             this.WordCount = value.WordCount;
             this.CharCount = value.CharCount;
-            this.Timestamp = value.TimeStamp;
+            this.TimeStamp = value.TimeStamp;
             this.FilenameHash = value.FilenameHash;
         }
         public EventEntity() { }
@@ -44,9 +41,6 @@ namespace keydiary.Controllers
 
     public class ValuesController : ApiController
     {
-        static CloudStorageAccount storageAccount;
-        static CloudTableClient tableClient;
-
         // GET api/values
         public IEnumerable<string> Get()
         {
@@ -62,24 +56,36 @@ namespace keydiary.Controllers
         // POST api/values
         public string Post([FromBody]List<Data> values)
         {
-            // 構成ファイルから Azure Storage への接続文字列を取得
-            storageAccount = CloudStorageAccount.Parse(
-                CloudConfigurationManager.GetSetting("StorageConnectionString"));
-
-            // Create the table client.
-            tableClient = storageAccount.CreateCloudTableClient();
-
             try
             {
-                foreach (Data value in values)
+                // 構成ファイルから Azure Storage への接続文字列を取得
+                string setting = CloudConfigurationManager.GetSetting("StorageConnectionString");
+                CloudStorageAccount account = CloudStorageAccount.Parse(setting);
+
+                // Create the table client.
+                CloudTableClient client = account.CreateCloudTableClient();
+
+                // Create batch.
+                TableBatchOperation batch = new TableBatchOperation();
+                foreach (var value in values)
                 {
-                    addEntity(value);
+                    // Add Insert operation to batch.
+                    batch.Add(TableOperation.Insert(new EventEntity(value)));
                 }
-            } catch (Exception e)
+
+                // Get the CloudTable object reference that represents the "event" table.
+                CloudTable table = client.GetTableReference("event");
+                table.CreateIfNotExists();
+
+                // Execute batch operation.
+                table.ExecuteBatch(batch);
+
+                return "OK";
+            }
+            catch (Exception e)
             {
                 return e.Message;
             }
-            return "OK";
         }
 
         // PUT api/values/5
@@ -90,19 +96,6 @@ namespace keydiary.Controllers
         // DELETE api/values/5
         public void Delete(int id)
         {
-        }
-
-        //エンティティの追加
-        static void addEntity(Data value)
-        {
-            // Create the CloudTable object that represents the "people" table.
-            CloudTable table = tableClient.GetTableReference("event");
-
-            // Create the TableOperation object that inserts the customer entity.
-            TableOperation insertOperation = TableOperation.Insert(new EventEntity(value));
-
-            // Execute the insert operation.
-            table.Execute(insertOperation);
         }
     }
 }
